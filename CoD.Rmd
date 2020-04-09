@@ -1,0 +1,572 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+```{r}
+library(caret)
+library(DMwR)
+library(mlbench)
+library(RSSL)
+library(kernlab)
+library(microbenchmark)
+```
+
+```{r}
+dataName <- "Sonar"
+dataset <- get(data(list = dataName))
+indx <- sapply(dataset, is.factor)
+indx[length(indx)] <- FALSE
+dataset[indx] <- lapply(dataset[indx], function(x) as.numeric(as.character(x)))
+str(dataset)
+
+# dataset <- dataset[sample(1:nrow(dataset), 50, replace = FALSE),]
+split <- createDataPartition(y = dataset$Class, p = 0.8, list = FALSE)
+training <- dataset[split,]
+test <- dataset[-split,]
+cat("Dimensions of Training Set : ",dim(training),"\n")
+cat("Dimensions of Test Set : ",dim(test))
+```
+
+```{r}
+dataName <- "Ionosphere"
+dataset <- get(data(list = dataName))
+indx <- sapply(dataset, is.factor)
+indx[length(indx)] <- FALSE
+dataset[indx] <- lapply(dataset[indx], function(x) as.numeric(as.character(x)))
+str(dataset)
+
+split <- createDataPartition(y = dataset$Class, p = 0.8, list = FALSE)
+training <- dataset[split,-(1:3)]
+test <- dataset[-split,-(1:3)]
+cat("Dimensions of Training Set : ",dim(training),"\n")
+cat("Dimensions of Test Set : ",dim(test))
+```
+
+```{r}
+normalSVM <- function(training,test)
+{
+  trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+  svm_Linear <- train(Class~., data = training, method = "svmLinear",trControl=trctrl,
+  preProcess = c("center", "scale"),tuneLength = 10)
+  cat("Training Accuracy by SVM on data :",svm_Linear$results$Accuracy, "\n")
+  
+  test_pred <- predict(svm_Linear, test)
+  cat("Test Accuracy by SVM on data :",confusionMatrix(table(test_pred,test$Class))$overall[1], "\n\n")
+  resultlist <- list("train" = svm_Linear$results$Accuracy, "test" = confusionMatrix(table(test_pred,test$Class))$overall[1])
+  return(resultlist)
+}
+```
+
+```{r}
+normalKNN <- function(training,test)
+{  
+  knn5 <- kNN(Class~., training, test, k = 5)
+  conf_matrix <- table(test[,'Class'],knn5)
+  accuracy <- function(x){sum(diag(x)/(sum(rowSums(x)))) * 100}
+  cat("Test Accuracy by SVM on data :",accuracy(conf_matrix), "\n\n")
+}
+```
+
+```{r}
+PCAdata <- function(training,test)
+{
+  scaled_data <- apply(training[,-ncol(training)],2,scale)
+  
+  pca.cov <- cov(scaled_data)
+  pca.eigen <- eigen(pca.cov)
+
+  PropVE <- pca.eigen$values / sum(pca.eigen$values)
+  round(PropVE,2)
+
+  sum <- 0.0
+  count <- 0
+  for(x in PropVE)
+  {
+    count = count + 1
+    sum = sum + x
+    if(sum >= 0.95)
+      break
+  }
+
+  phi <- pca.eigen$vectors[,1:count]
+  PC <- as.matrix(training[,-ncol(training)]) %*% phi
+  PCtest <- as.matrix(test[,-ncol(test)]) %*% phi
+
+  PCwithClass <- data.frame(cbind(PC,training[,ncol(training)]))
+  PCwithClass[,ncol(PCwithClass)] <- as.factor(PCwithClass[,ncol(PCwithClass)])
+  names(PCwithClass)[ncol(PCwithClass)] <- "Class"
+  
+  PCwithClassTest <- data.frame(cbind(PCtest,test[,ncol(test)]))
+  PCwithClassTest[,ncol(PCwithClassTest)] <- as.factor(PCwithClassTest[,ncol(PCwithClassTest)])
+  names(PCwithClassTest)[ncol(PCwithClassTest)] <- "Class"
+
+  cat("Number of Dimensions reduced from ",ncol(training)-1, " to ",ncol(PCwithClass)-1, "by PCA.\n")
+
+#   trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+#   svm_Linear <- train(Class~., data = PCwithClass, method = "svmLinear",trControl=trctrl,
+# preProcess = c("center", "scale"),tuneLength = 10)
+#   cat("Training Accuracy by SVM on data with dimentionality reduction(PCA) :",svm_Linear$results$Accuracy, "\n")
+#   
+#   test_pred_PCA <- predict(svm_Linear, PCwithClassTest)
+#   
+#   cat("Test Accuracy by SVM on data with dimentionality reduction(PCA) :",confusionMatrix(table(test_pred_PCA,PCwithClassTest$Class))$overall[1], "\n\n")
+  
+  returnlist <- list("train" = PCwithClass, "test" = PCwithClassTest)
+  return(returnlist)
+}
+```
+
+```{r}
+PCAdataComponents <- function(training,test,k)
+{
+  scaled_data <- apply(training[,-ncol(training)],2,scale)
+  
+  pca.cov <- cov(scaled_data)
+  pca.eigen <- eigen(pca.cov)
+
+  PropVE <- pca.eigen$values / sum(pca.eigen$values)
+  round(PropVE,2)
+
+  sum <- 0.0
+  count <- 0
+  for(x in PropVE)
+  {
+    count = count + 1
+    sum = sum + x
+    if(sum >= 0.95)
+      break
+  }
+
+  count <- k
+  phi <- pca.eigen$vectors[,1:count]
+  PC <- as.matrix(training[,-ncol(training)]) %*% phi
+  PCtest <- as.matrix(test[,-ncol(test)]) %*% phi
+
+  PCwithClass <- data.frame(cbind(PC,training[,ncol(training)]))
+  PCwithClass[,ncol(PCwithClass)] <- as.factor(PCwithClass[,ncol(PCwithClass)])
+  names(PCwithClass)[ncol(PCwithClass)] <- "Class"
+  
+  PCwithClassTest <- data.frame(cbind(PCtest,test[,ncol(test)]))
+  PCwithClassTest[,ncol(PCwithClassTest)] <- as.factor(PCwithClassTest[,ncol(PCwithClassTest)])
+  names(PCwithClassTest)[ncol(PCwithClassTest)] <- "Class"
+
+  cat("Number of Dimensions reduced from ",ncol(training)-1, " to ",ncol(PCwithClass)-1, "by PCA.\n")
+
+  returnlist <- list("train" = PCwithClass, "test" = PCwithClassTest)
+  return(returnlist)
+}
+```
+
+```{r}
+SVDdata <- function(training,test)
+{
+  # data <- apply(training[,-ncol(training)],2,scale)
+  data <- as.matrix(training[,-ncol(training)])
+  n <- nrow(data)
+  m <- ncol(data)
+  ind <- min(c(n,m))
+  U_calc <- data %*% t(data)
+  U_pca.eigen <- eigen(U_calc)
+  U <- U_pca.eigen$vectors
+  for (x in seq(1:n))
+  {
+    if(U[1,x] < 0)
+      U[,x] = U[,x] * -1
+  }
+  diagsum <- 0.0
+  S <- matrix(0, nrow = n, ncol = m)
+  for (x in seq(1:ind))
+  {
+    S[x,x] = sqrt(U_pca.eigen$values[x])
+    diagsum <- diagsum + sqrt(U_pca.eigen$values[x]) 
+  }
+  V_calc <- t(data) %*% data
+  V_pca.eigen <- eigen(V_calc)
+  V <- V_pca.eigen$vectors
+  for (x in seq(1:m))
+  {
+    if(V[1,x] < 0)
+      V[,x] = V[,x] * -1
+  }
+  sum <- 0.0
+  i <- 0
+  for(x in seq(1:m))
+  {
+    i <- i+1
+    sum <- sum + S[x,x]
+    if(sum/diagsum > 0.95)
+      break;
+  }
+  SVD_rec <- as.matrix(training[,-ncol(training)]) %*% V[,1:i] 
+  SVD_recTest <- as.matrix(test[,-ncol(test)]) %*% V[,1:i]
+  
+  SVDwithClass <- data.frame(cbind(SVD_rec,training[,ncol(training)]))
+  SVDwithClass[,ncol(SVDwithClass)] <- as.factor(SVDwithClass[,ncol(SVDwithClass)])
+  names(SVDwithClass)[ncol(SVDwithClass)] <- "Class"
+  
+  SVDwithClassTest <- data.frame(cbind(SVD_recTest,test[,ncol(test)]))
+  SVDwithClassTest[,ncol(SVDwithClassTest)] <- as.factor(SVDwithClassTest[,ncol(SVDwithClassTest)])
+  names(SVDwithClassTest)[ncol(SVDwithClassTest)] <- "Class"
+  
+  cat("Number of Dimensions reduced from ",ncol(training)-1, " to ",ncol(SVDwithClass)-1, "by SVD.\n")
+  
+  returnlist <- list("train" = SVDwithClass, "test" = SVDwithClassTest)
+  return(returnlist)
+}
+```
+
+```{r}
+SVDdataComponents <- function(training,test,k)
+{
+  # data <- apply(training[,-ncol(training)],2,scale)
+  data <- as.matrix(training[,-ncol(training)])
+  n <- nrow(data)
+  m <- ncol(data)
+  ind <- min(c(n,m))
+  U_calc <- data %*% t(data)
+  U_pca.eigen <- eigen(U_calc)
+  U <- U_pca.eigen$vectors
+  for (x in seq(1:n))
+  {
+    if(U[1,x] < 0)
+      U[,x] = U[,x] * -1
+  }
+  diagsum <- 0.0
+  S <- matrix(0, nrow = n, ncol = m)
+  for (x in seq(1:ind))
+  {
+    S[x,x] = sqrt(U_pca.eigen$values[x])
+    diagsum <- diagsum + sqrt(U_pca.eigen$values[x]) 
+  }
+  V_calc <- t(data) %*% data
+  V_pca.eigen <- eigen(V_calc)
+  V <- V_pca.eigen$vectors
+  for (x in seq(1:m))
+  {
+    if(V[1,x] < 0)
+      V[,x] = V[,x] * -1
+  }
+  sum <- 0.0
+  i <- 0
+  for(x in seq(1:m))
+  {
+    i <- i+1
+    sum <- sum + S[x,x]
+    if(sum/diagsum > 0.95)
+      break;
+  }
+  i <- k
+  SVD_rec <- as.matrix(training[,-ncol(training)]) %*% V[,1:i] 
+  SVD_recTest <- as.matrix(test[,-ncol(test)]) %*% V[,1:i]
+  
+  SVDwithClass <- data.frame(cbind(SVD_rec,training[,ncol(training)]))
+  SVDwithClass[,ncol(SVDwithClass)] <- as.factor(SVDwithClass[,ncol(SVDwithClass)])
+  names(SVDwithClass)[ncol(SVDwithClass)] <- "Class"
+  
+  SVDwithClassTest <- data.frame(cbind(SVD_recTest,test[,ncol(test)]))
+  SVDwithClassTest[,ncol(SVDwithClassTest)] <- as.factor(SVDwithClassTest[,ncol(SVDwithClassTest)])
+  names(SVDwithClassTest)[ncol(SVDwithClassTest)] <- "Class"
+  
+  cat("Number of Dimensions reduced from ",ncol(training)-1, " to ",ncol(SVDwithClass)-1, "by SVD.\n")
+  
+  returnlist <- list("train" = SVDwithClass, "test" = SVDwithClassTest)
+  return(returnlist)
+}
+```
+
+```{r}
+normalSVM(training,test)
+a <- SVDdata(training,test)
+normalSVM(a$train,a$test)
+```
+
+```{r}
+normalSVM(training,test)
+a <- PCAdata(training,test)
+normalSVM(a$train,a$test)
+normalKNN(training,test)
+normalKNN(a$train,a$test)
+```
+
+```{r}
+KPCAdata <- function(data,data_test,sigma,k)
+{
+  n <- nrow(data)
+  dat <- as.matrix(data[,-ncol(data)])
+  kern <- matrix(,nrow = n , ncol = n )
+  for (x in seq(1:n))
+  {
+    for(y in seq(1:n))
+    {
+      kern[x,y] = exp(sigma * (2*crossprod(dat[x,],dat[y,]) - crossprod(dat[x,]) - crossprod(dat[y,])))
+      kern[y,x] = kern[x,y]
+    }
+  }
+  
+  m <- nrow(data_test)
+  dat_test <- as.matrix(data_test[,-ncol(data_test)])
+  kern_test <- matrix(,nrow = m , ncol = n)
+  for (x in seq(1:m))
+  {
+    for(y in seq(1:n))
+    {
+      kern_test[x,y] = exp(sigma * (2*crossprod(dat_test[x,],dat[y,]) - crossprod(dat_test[x,]) - crossprod(dat[y,])))
+    }
+  }
+  
+  scaled_kern_test <- t(t(kern_test - rowSums(kern_test)/n) - rowSums(kern)/n) + sum(kern)/(m*n)
+  ones <- diag(dim(kern)[1]) / dim(kern)[1]
+  m <- dim(kern)[1]
+  scaled_kern <- t(t(kern - colSums(kern)/m) -  rowSums(kern)/m) + sum(kern)/m^2
+  kpcat.eigen <- eigen(scaled_kern/m, symmetric = TRUE)
+
+  # print(kpcat.eigen$values)
+  # print(n)
+  # diagsum <- 0.0
+  # for(x in seq(1:n))
+  # {
+  #   diagsum <- diagsum + kpcat.eigen$values[x]
+  # }
+  # print("b")
+  # sum <- 0.0
+  # i <- 0
+  # for(x in seq(1:n))
+  # {
+  #   i <- i+1
+  #   sum <- sum + kpcat.eigen$values[x]
+  #   if(sum/diagsum > 0.95)
+  #     break;
+  # }
+  # print(i)
+  
+  KPC <- t(t(kpcat.eigen$vectors[,1:k])/sqrt(kpcat.eigen$values[1:k]))
+  KPC1 <- scaled_kern %*% KPC
+  KPC1_test <- scaled_kern_test %*% KPC
+  
+  KPCwithClass <- data.frame(cbind(KPC1,data[,ncol(data)]))
+  KPCwithClass[,ncol(KPCwithClass)] <- as.factor(KPCwithClass[,ncol(KPCwithClass)])
+  names(KPCwithClass)[ncol(KPCwithClass)] <- "Class"
+
+  
+  KPCwithClassTest <- data.frame(cbind(KPC1_test,data_test[,ncol(data_test)]))
+  KPCwithClassTest[,ncol(KPCwithClassTest)] <- as.factor(KPCwithClassTest[,ncol(KPCwithClassTest)])
+  names(KPCwithClassTest)[ncol(KPCwithClassTest)] <- "Class"
+  
+  plot(KPCwithClass$X1, KPCwithClass$X2 ,col = KPCwithClass$Class, asp = 1)
+  
+  returnlist <- list("train" = KPCwithClass, "test" = KPCwithClassTest)
+  return(returnlist)
+#   
+#   trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+#   svm_Linear <- train(Class~., data = KPCwithClass, method = "svmLinear",trControl=trctrl,
+# preProcess = c("center", "scale"),tuneLength = 10)
+#   cat("Training Accuracy by SVM on data with dimentionality reduction(PCA) :",svm_Linear$results$Accuracy, "\n")
+#   
+#   test_pred_KPCA <- predict(svm_Linear, KPCwithClassTest)
+#   
+#   cat("Test Accuracy by SVM on data with dimentionality reduction(PCA) :",confusionMatrix(table(test_pred_KPCA,KPCwithClassTest$Class))$overall[1], "\n\n")
+#   
+}
+```
+
+```{r}
+c <- normalSVM(training,test)
+trainingErrorKPCA <- double(7)
+testErrorKPCA <- double(7)
+timingDim <- double(7)
+for(x in seq(10,40,5))
+{
+  a <- KPCAdata(training,test,0.9,x)
+  startTime <- Sys.time()
+  b <- normalSVM(a$train,a$test)
+  endTime <- Sys.time()
+  trainingErrorKPCA[(x/5) -1] <- b$train
+  testErrorKPCA[(x/5) -1] <- b$test
+  timingDim[(x/5)-1] <- endTime - startTime
+}
+print(trainingErrorKPCA)
+plot(x = seq(10,40,by = 5), y = trainingErrorKPCA,type = 'b',col = "blue" , ylim = c(0.5,1),xlab = "Dimensions",ylab = "Accuracy",main = "KPCA - Sonar")
+lines(x = seq(10,40,by = 5), y = testErrorKPCA,col = "red",type = 'b')
+lines(x = seq(10,40,by = 5), y = c(rep(c$train,7)) , col = "orange",type = 'b')
+lines(x = seq(10,40,by = 5), y = c(rep(c$test,7)) , col = "green",type = 'b')
+legend("bottomright",
+       legend = c("Training Error KPCA","Test Error KPCA","Training Error Normal","Test Error Normal"),
+       col = c("blue","red","orange","green"),
+       pch = c(20,20), bty = "n", pt.cex = 1.5, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+```
+
+```{r}
+c <- normalSVM(training,test)
+trainingErrorPCA <- double(7)
+testErrorPCA <- double(7)
+timingDim <- double(7)
+for(x in seq(10,40,5))
+{
+  a <- PCAdataComponents(training,test,x)
+  b <- normalSVM(a$train,a$test)
+  trainingErrorPCA[(x/5) -1] <- b$train
+  testErrorPCA[(x/5) -1] <- b$test
+}
+print(trainingErrorPCA)
+plot(x = seq(10,40,by = 5), y = trainingErrorPCA,type = 'b',col = "blue" , ylim = c(0.5,1),xlab = "Dimensions",ylab = "Accuracy",main = "PCA - Sonar")
+lines(x = seq(10,40,by = 5), y = testErrorPCA,col = "red",type = 'b')
+lines(x = seq(10,40,by = 5), y = c(rep(c$train,7)) , col = "orange",type = 'b')
+lines(x = seq(10,40,by = 5), y = c(rep(c$test,7)) , col = "green",type = 'b')
+legend("bottomright",
+       legend = c("Training Error PCA","Test Error PCA","Training Error Normal","Test Error Normal"),
+       col = c("blue","red","orange","green"),
+       pch = c(20,20), bty = "n", pt.cex = 1.5, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+```
+
+```{r}
+c <- normalSVM(training,test)
+trainingErrorSVD <- double(7)
+testErrorSVD <- double(7)
+# timingDim <- double(7)
+for(x in seq(10,40,5))
+{
+  a <- SVDdataComponents(training,test,x)
+  # tim <- microbenchmark(b <- normalSVM(a$train,a$test), times = 5)
+  b <- normalSVM(a$train,a$test)
+  trainingErrorSVD[(x/5) -1] <- b$train
+  testErrorSVD[(x/5) -1] <- b$test
+  # timingDim[(x/5)-1] <- sum(tim$time)/5
+}
+print(trainingErrorSVD)
+plot(x = seq(10,40,by = 5), y = trainingErrorSVD,type = 'b',col = "blue" , ylim = c(0.5,1),xlab = "Dimensions",ylab = "Accuracy",main = "SVD - Sonar")
+lines(x = seq(10,40,by = 5), y = testErrorSVD,col = "red",type = 'b')
+lines(x = seq(10,40,by = 5), y = c(rep(c$train,7)) , col = "orange",type = 'b')
+lines(x = seq(10,40,by = 5), y = c(rep(c$test,7)) , col = "green",type = 'b')
+legend("bottomright",
+       legend = c("Training Error SVD","Test Error SVD","Training Error Normal","Test Error Normal"),
+       col = c("blue","red","orange","green"),
+       pch = c(20,20), bty = "n", pt.cex = 1.5, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+
+```
+
+```{r}
+plot(x = seq(10,40,by = 5), y = trainingErrorSVD,type = 'b',col = rgb(0,0,1) , ylim = c(0.5,1), xlab = 'Dimensions of Dataset', ylab = 'Accuracy')
+lines(x = seq(10,40,by = 5), y = testErrorSVD,col = rgb(0,0,0.5), type = 'b')
+lines(x = seq(10,40,by = 5), y = testErrorPCA,col = rgb(0.5,0,0), type = 'b')
+lines(x = seq(10,40,by = 5), y = trainingErrorPCA,col = rgb(1,0,0), type = 'b')
+lines(x = seq(10,40,by = 5), y = testErrorKPCA,col = rgb(0,0.5,0), type = 'b')
+lines(x = seq(10,40,by = 5), y = trainingErrorKPCA,col = rgb(0,1,0), type = 'b')
+```
+
+```{r}
+plot(x = seq(10,40,5),y = timingDim,col = "blue",type = 'b',xlab = 'Dimensions of Dataset', ylab = 'Time in Nanoseconds')
+```
+```{r}
+y <- microbenchmark(normalSVM(training,test),times = 5)
+str(y)
+```
+
+
+```{r}
+c <- normalSVM(training,test)
+trainingErrorKPCA <- double(7)
+testErrorKPCA <- double(7)
+timingDim <- double(7)
+for(x in seq(9,27,3))
+{
+  a <- KPCAdata(training,test,0.5,x)
+  startTime <- Sys.time()
+  b <- normalSVM(a$train,a$test)
+  endTime <- Sys.time()
+  trainingErrorKPCA[(x/3) -2] <- b$train
+  testErrorKPCA[(x/3) -2] <- b$test
+  timingDim[(x/3)-2] <- endTime - startTime
+}
+print(trainingErrorKPCA)
+plot(x = seq(9,27,by = 3), y = trainingErrorKPCA,type = 'b',col = "blue" , ylim = c(0.5,1),xlab = "Dimensions",ylab = "Accuracy",main = "KPCA - Ionosphere")
+lines(x = seq(9,27,by = 3), y = testErrorKPCA,type = 'b',col = "red")
+lines(x = seq(9,27,by = 3), y = c(rep(c$train,7)) ,type = 'b', col = "orange")
+lines(x = seq(9,27,by = 3), y = c(rep(c$test,7)) ,type = 'b', col = "green")
+legend("bottomright",
+       legend = c("Training Error KPCA","Test Error KPCA","Training Error Normal","Test Error Normal"),
+       col = c("blue","red","orange","green"),
+       pch = c(20,20), bty = "n", pt.cex = 1.5, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+```
+
+```{r}
+c <- normalSVM(training,test)
+trainingErrorPCA <- double(7)
+testErrorPCA <- double(7)
+timingDim <- double(7)
+for(x in seq(9,27,3))
+{
+  a <- PCAdataComponents(training,test,x)
+  b <- normalSVM(a$train,a$test)
+  trainingErrorPCA[(x/3) -2] <- b$train
+  testErrorPCA[(x/3) -2] <- b$test
+}
+print(trainingErrorPCA)
+plot(x = seq(9,27,by = 3), y = trainingErrorPCA,type = 'b',col = "blue" , ylim = c(0.5,1),xlab = "Dimensions",ylab = "Accuracy",main = "PCA - Ionosphere")
+lines(x = seq(9,27,by = 3), y = testErrorPCA,type = "b",col = "red")
+lines(x = seq(9,27,by = 3), y = c(rep(c$train,7)) ,type = "b", col = "orange")
+lines(x = seq(9,27,by = 3), y = c(rep(c$test,7)) ,type = "b", col = "green")
+legend("bottomright",
+       legend = c("Training Error PCA","Test Error PCA","Training Error Normal","Test Error Normal"),
+       col = c("blue","red","orange","green"),
+       pch = c(20,20), bty = "n", pt.cex = 1.5, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+
+```
+
+```{r}
+c <- normalSVM(training,test)
+trainingErrorSVD <- double(7)
+testErrorSVD <- double(7)
+# timingDim <- double(7)
+for(x in seq(9,27,3))
+{
+  a <- SVDdataComponents(training,test,x)
+  # tim <- microbenchmark(b <- normalSVM(a$train,a$test), times = 5)
+  b <- normalSVM(a$train,a$test)
+  trainingErrorSVD[(x/3) -2] <- b$train
+  testErrorSVD[(x/3) -2] <- b$test
+  # timingDim[(x/3)-2] <- sum(tim$time)/5
+}
+print(trainingErrorSVD)
+plot(x = seq(9,27,by = 3), y = trainingErrorSVD,type = "b",col = "blue" , ylim = c(0.5,1),main = "SVD - Ionosphere",xlab = "Dimensions",ylab = "Accuracy")
+lines(x = seq(9,27,by = 3), y = testErrorSVD,col = "red",type = "b")
+lines(x = seq(9,27,by = 3), y = c(rep(c$train,7)) , col = "orange",type = "b")
+lines(x = seq(9,27,by = 3), y = c(rep(c$test,7)) , col = "green",type = "b")
+legend("bottomright",
+       legend = c("Training Error SVD","Test Error SVD","Training Error Normal","Test Error Normal"),
+       col = c("blue","red","orange","green"),
+       pch = c(20,20), bty = "n", pt.cex = 1.5, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+
+```
+
+```{r}
+plot(x = seq(9,27,by = 3), y = trainingErrorSVD,type = 'b',col = rgb(0,0,1) , ylim = c(0.5,1), xlab = 'Dimensions of Dataset', ylab = 'Accuracy')
+lines(x = seq(9,27,by = 3), y = testErrorSVD,col = rgb(0,0,0.5), type = 'b')
+lines(x = seq(9,27,by = 3), y = testErrorPCA,col = rgb(0.5,0,0), type = 'b')
+lines(x = seq(9,27,by = 3), y = trainingErrorPCA,col = rgb(1,0,0), type = 'b')
+lines(x = seq(9,27,by = 3), y = testErrorKPCA,col = rgb(0,0.5,0), type = 'b')
+lines(x = seq(9,27,by = 3), y = trainingErrorKPCA,col = rgb(0,1,0), type = 'b')
+```
+
+
+```{r}
+data <- generateTwoCircles(100,noise_var = 0)
+# data <- generateCrescentMoon(100,2,0)
+
+split <- createDataPartition(y = data$Class, p = 0.8, list = FALSE)
+training <- data[split,]
+test <- data[-split,]
+cat("Dimensions of Training Set : ",dim(training),"\n")
+cat("Dimensions of Test Set : ",dim(test)) 
+
+plot(data$X1, data$X2, col = data$Class, asp = 1)
+str(data)
+```
+
+```{r}
+normalSVM(training,test)
+a <- KPCAdata(training,test,-0.2,2)
+normalSVM(a$train,a$test)
+```

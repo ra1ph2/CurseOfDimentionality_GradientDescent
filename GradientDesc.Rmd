@@ -1,0 +1,514 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+```{r}
+library(mlbench)
+library(microbenchmark)
+```
+
+```{r}
+data("BostonHousing")
+BostonHousing$chas <- as.numeric(BostonHousing$chas)
+x <- as.matrix(BostonHousing[,1:13])
+x <- scale(x)
+y <- as.vector(BostonHousing[,14])
+print(dim(x))
+print(length(y))
+```
+
+<!-- ```{r} -->
+<!-- z <- mlbench.peak(1000,20) -->
+<!-- x <- z$x -->
+<!-- y <- z$y -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- x <- runif(500,0,10) -->
+<!-- y <- x + rnorm(500 , sd = 0.5) + 1 -->
+<!-- plot(x,y,col = rgb(0.7,0.1,0.2,0.5)) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- # Exact Normal Linear Regression by Formula -->
+<!-- linear_reg <- lm(y ~ x) -->
+<!-- # plot(x,y,col = rgb(0.7,0.1,0.2,0.5)) -->
+<!-- # abline(linear_reg, col = 'red') -->
+<!-- str(linear_reg) -->
+<!-- ``` -->
+
+```{r}
+batchGDthres <- function(x,y,learning_rate,threshold)
+{
+  # Normal Grradient Descent
+  # learning_rate <- 0.01
+  iters <- 1000
+  # threshold <- 0.01
+  
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot <- double(iters)
+  theta_plot <- list(iters)
+  m <- iters
+  for(i in 1:iters)
+  {
+    delta <- ( t(X) %*% (X %*% theta - y) ) /(length(y))
+    theta <- theta - learning_rate * delta
+    cost_plot[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+    if(i != 1)
+    {  
+      if(abs(cost_plot[i] - cost_plot[i-1]) < threshold)
+      {  
+        m <- i
+        break
+      }
+    }
+  }
+  returnlist <- list("cost" = cost_plot,"iters"= m,"theta" = theta)
+  return(returnlist)
+}
+```
+
+```{r}
+batchGDiters <- function(x,y,learning_rate,iters)
+{
+  # Normal Grradient Descent
+  # learning_rate <- 0.01
+  
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot <- double(iters)
+  theta_plot <- list(iters)
+  m <- iters
+  for(i in 1:iters)
+  {
+    delta <- ( t(X) %*% (X %*% theta - y) ) /(length(y))
+    theta <- theta - learning_rate * delta
+    cost_plot[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+  }
+  returnlist <- list("cost" = cost_plot,"iters"= m,"theta" = theta)
+  return(returnlist)
+}
+```
+
+
+```{r}
+a <- batchGDiters(x,y,0.3,50)
+plot(a$cost[1:a$iters], type = 'line',col = "blue",xlab = "Iterations", ylab ="Cost")
+legend("topright",
+       legend = c("Learning Rate - 0.3"),
+       col = c("red"),
+       pch = c(20,20), bty = "n", pt.cex = 2, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+```
+
+```{r}
+miniBatchGDthres <- function(x,y,learning_rate,threshold,batch_size)
+{
+  # Stochastic Gradient Descent
+  # learning_rate <- 0.01
+  iters <- 1000
+  # threshold <- 0.01
+  
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot_sto <- double(iters)
+  theta_plot <- list(iters)
+  m_sto <- iters
+  for(i in 1:iters)
+  {
+    ind <- sample(nrow(X), size = batch_size , replace = FALSE)
+    X_samp <- X[ind,]
+    y_samp <- y[ind]
+    delta <- ( t(X_samp) %*% (X_samp %*% theta - y_samp) ) /(length(y_samp))
+    theta <- theta - learning_rate * delta
+    cost_plot_sto[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+    if(i != 1)
+    {
+      if(abs(cost_plot_sto[i] - cost_plot_sto[i-1]) < threshold)
+      {
+        m_sto <- i
+        break
+      }
+    }
+  }
+  returnlist <- list("cost" = cost_plot_sto,"iters"= m_sto,"theta" = theta)
+  return(returnlist)
+}
+```
+
+```{r}
+stocGDthres <- function(x,y,learning_rate,threshold)
+{
+  # Stochastic Gradient Descent
+  # learning_rate <- 0.01
+  iters <- 1000
+  # threshold <- 0.01
+  
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot_sto <- double(iters)
+  theta_plot <- list(iters)
+  m_sto <- iters
+  for(i in 1:iters)
+  {
+    ind <- sample(nrow(X), size = 1 , replace = FALSE)
+    X_samp <- X[ind,]
+    y_samp <- y[ind]
+    delta <- ( t(matrix(X_samp,nrow=1)) %*% (matrix(X_samp,nrow=1) %*% theta - y_samp) ) /(length(y_samp))
+    theta <- theta - learning_rate * delta
+    cost_plot_sto[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+    if(i != 1)
+    {
+      if(abs(cost_plot_sto[i] - cost_plot_sto[i-1]) < threshold)
+      {
+        m_sto <- i
+        break
+      }
+    }
+  }
+  returnlist <- list("cost" = cost_plot_sto,"iters"= m_sto,"theta" = theta)
+  return(returnlist)
+}
+```
+
+```{r}
+miniBatchGDiters <- function(x,y,learning_rate,iters,batch_size)
+{
+  # Stochastic Gradient Descent
+  # learning_rate <- 0.01
+  
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot_sto <- double(iters)
+  theta_plot <- list(iters)
+  m_sto <- iters
+  for(i in 1:iters)
+  {
+    ind <- sample(nrow(X), size = batch_size , replace = FALSE)
+    X_samp <- X[ind,]
+    y_samp <- y[ind]
+    delta <- ( t(X_samp) %*% (X_samp %*% theta - y_samp) ) / (length(y_samp))
+    theta <- theta - learning_rate * delta
+    cost_plot_sto[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+  }
+  returnlist <- list("cost" = cost_plot_sto,"iters"= m_sto,"theta" = theta)
+  return(returnlist)
+}
+```
+
+```{r}
+j <- miniBatchGDiters(x,y,0.05,200,20)
+plot(j$cost[1:j$iters], type = 'line' , col = "blue",xlab = "Iterations",ylab = "Cost")
+```
+
+```{r}
+stocGDiters <- function(x,y,learning_rate,iters)
+{
+  # Stochastic Gradient Descent
+  # learning_rate <- 0.01
+  
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot_sto <- double(iters)
+  theta_plot <- list(iters)
+  m_sto <- iters
+  for(i in 1:iters)
+  {
+    ind <- sample(nrow(X), size = 1 , replace = FALSE)
+    X_samp <- X[ind,]
+    y_samp <- y[ind]
+    delta <- ( t(matrix(X_samp,nrow=1)) %*% (matrix(X_samp,nrow=1) %*% theta - y_samp) ) / (length(y_samp))
+    theta <- theta - learning_rate * delta
+    cost_plot_sto[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+  }
+  returnlist <- list("cost" = cost_plot_sto,"iters"= m_sto,"theta" = theta)
+  return(returnlist)
+}
+```
+
+```{r}
+b <- stocGDiters(x,y,0.05,200)
+plot(b$cost[1:b$iters], type = 'line' , col = "blue",xlab = "Iterations",ylab = "Cost")
+```
+
+```{r}
+microbenchmark(a <- batchGDiters(x,y,0.01,200),b <- stocGDiters(x,y,0.01,200),c <- miniBatchGDiters(x,y,0.01,200,30), times = 5)
+ind <- min(c(a$iters,b$iters,c$iters))
+plot(b$cost[1:ind], type = 'line' , col = "blue",xlab = "Iterations",ylab = "Cost")
+lines(a$cost[1:ind], col = "red")
+lines(c$cost[1:ind], col = "green")
+legend("topright",
+       legend = c("Stochastic","Batch","Mini Batch"),
+       col = c("blue","red","green"),
+       pch = c(20,20), bty = "n", pt.cex = 1.5, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+
+```
+
+```{r}
+momentumMiniGDiters <- function(x,y,learning_rate,iters,batch_size)
+{
+  # Momentum with Stochastic Descent
+  # learning_rate <- 0.01
+  retention <- 0.9
+  # iters <- 1000
+  # threshold <- 0.00001
+  
+  velocity <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot <- double(iters)
+  theta_plot <- list(iters)
+  m <- iters
+  for(i in 1:iters)
+  {
+    ind <- sample(nrow(X), size = batch_size , replace = FALSE)
+    X_samp <- X[ind,]
+    y_samp <- y[ind]
+    delta <- ( t(X_samp) %*% (X_samp %*% theta - y_samp) ) /(length(y_samp))
+    velocity <- retention * velocity + learning_rate * delta
+    theta <- theta - velocity
+    cost_plot[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+    # if(i != 1)
+    # {
+    #   if(abs(cost_plot[i] - cost_plot[i-1]) < threshold)
+    #   {
+    #     m <- i
+    #     break
+    #   }
+    # }
+  }
+  returnlist <- list("cost" = cost_plot,"iters"= m, "theta" = theta)
+  return(returnlist)
+}
+```
+
+```{r}
+momentumBatchGDiters <- function(x,y,learning_rate,iters)
+{
+  # Momentum with Stochastic Descent
+  # learning_rate <- 0.01
+  retention <- 0.9
+  # iters <- 1000
+  # threshold <- 0.00001
+  
+  velocity <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot <- double(iters)
+  theta_plot <- list(iters)
+  m <- iters
+  for(i in 1:iters)
+  {
+    delta <- ( t(X) %*% (X %*% theta - y) ) /(length(y))
+    velocity <- retention * velocity + learning_rate * delta
+    theta <- theta - velocity
+    cost_plot[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+    # if(i != 1)
+    # {
+    #   if(abs(cost_plot[i] - cost_plot[i-1]) < threshold)
+    #   {
+    #     m <- i
+    #     break
+    #   }
+    # }
+  }
+  returnlist <- list("cost" = cost_plot,"iters"= m, "theta" = theta)
+  return(returnlist)
+}
+```
+
+```{r}
+c <- momentumMiniGDiters(x,y,0.01,100,10)
+plot(c$cost[1:c$iters], type = 'line',col = "blue",xlab = "Iterations", ylab ="Cost",main = "Momentum with Mini-Batch")
+```
+
+```{r}
+nestrovMiniGDiters <- function(x,y,learning_rate,iters,batch_size)
+{
+  # learning_rate <- 0.01
+  retention <- 0.9
+  # iters <- 1000
+  # threshold <- 0.00001
+  
+  
+  velocity <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot <- double(iters)
+  theta_plot <- list(iters)
+  m <- iters
+  for(i in 1:iters)
+  {
+    ind <- sample(nrow(X), size = batch_size , replace = FALSE)
+    X_samp <- X[ind,]
+    y_samp <- y[ind]
+    theta_lookahead <- theta + retention * velocity
+    delta <- ( t(X_samp) %*% (X_samp %*% theta_lookahead - y_samp) ) /(length(y_samp))
+    velocity <- retention * velocity + learning_rate * delta
+    theta <- theta - velocity
+    cost_plot[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+    # if(i != 1)
+    # {
+    #   if(abs(cost_plot[i] - cost_plot[i-1]) < threshold)
+    #   {
+    #     m <- i
+    #     break
+    #   }
+    # }
+  }
+  returnlist <- list("cost" = cost_plot,"iters"= m, "theta" = theta)
+  return(returnlist)
+}
+```
+
+```{r}
+e <- nestrovMiniGDiters(x,y,0.01,100,10)
+plot(e$cost[1:e$iters], type = 'line',col = "blue",xlab = "Iterations", ylab ="Cost",main = "Nestrov Momentum with Mini-Batch")
+```
+
+
+```{r}
+adaMiniGDiters <- function(x,y,learning_rate,iters,batch_size)
+{
+  # learning_rate <- 0.5
+  # iters <- 5000
+  # threshold <- 0.00001
+  eps <- 1e-6
+  
+  delta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  prev_delta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot <- double(iters)
+  theta_plot <- list(iters)
+  m <- iters
+  for(i in 1:iters)
+  {
+    ind <- sample(nrow(X), size = batch_size , replace = FALSE)
+    X_samp <- X[ind,]
+    y_samp <- y[ind]
+    delta <- ( t(X_samp) %*% (X_samp %*% theta - y_samp) ) /(length(y_samp))
+    prev_delta <- prev_delta + (delta*delta)
+    ada <- sqrt(prev_delta) + eps
+    theta <- theta - learning_rate * (delta / ada)
+    cost_plot[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+    # if(i != 1)
+    # {
+    #   if(abs(cost_plot[i] - cost_plot[i-1]) < threshold)
+    #   {
+    #     m <- i
+    #     break
+    #   }
+    # }
+  }
+  returnlist <- list("cost" = cost_plot,"iters"= m, "theta" = theta)
+  return(returnlist)
+}
+```
+
+```{r}
+f <- adaMiniGDiters(x,y,2,100,20)
+plot(f$cost[1:f$iters], type = 'line',col = "blue",xlab = "Iterations", ylab ="Cost",main = "Adagrad with Mini-Batch" )
+```
+
+```{r}
+adamMiniGDiters <- function(x,y,learning_rate,iters,batch_size)
+{
+  # learning_rate <- 0.5
+  # iters <- 5000
+  # threshold <- 0.00001
+  eps <- 1e-8
+  beta1 <- 0.9
+  beta2 <- 0.999
+  
+  delta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  momentum <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  prev_delta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  theta <- matrix(c(rep(0,ncol(x)+1)), nrow = ncol(x)+1)
+  X <- cbind(1,x)
+  
+  cost_plot <- double(iters)
+  theta_plot <- list(iters)
+  m <- iters
+  for(i in 1:iters)
+  {
+    ind <- sample(nrow(X), size = batch_size , replace = FALSE)
+    X_samp <- X[ind,]
+    y_samp <- y[ind]
+    
+    delta <- ( t(X_samp) %*% (X_samp %*% theta - y_samp) ) /(length(y_samp))
+    prev_delta <- beta2 * prev_delta + (1-beta2)*(delta*delta)
+    momentum <- beta1 * momentum + (1-beta1)*(delta)
+    
+    ada <- prev_delta / ( 1 - beta2**i )
+    ada_iter <- sqrt(ada) + eps
+    momentum_iter <- momentum / ( 1 - beta1**i )
+    
+    theta <- theta - learning_rate * (momentum_iter / ada_iter)
+    cost_plot[i] <- sum((X %*% theta - y)^2) / (2*length(y))
+    theta_plot[[i]] <- theta
+    # if(i != 1)
+    # {
+    #   if(abs(cost_plot[i] - cost_plot[i-1]) < threshold)
+    #   {
+    #     m <- i
+    #     break
+    #   }
+    # }
+  }
+  returnlist <- list("cost" = cost_plot,"iters"= m, "theta" = theta)
+  return(returnlist)
+}  
+```
+
+```{r}
+g <- adamMiniGDiters(x,y,2,100,20)
+plot(g$cost[1:g$iters], type = 'line',col = "blue",xlab = "Iterations", ylab ="Cost",main = "Adam with Mini-Batch")
+```
+
+```{r}
+microbenchmark(a <- batchGDiters(x,y,0.01,200),
+               b <- stocGDiters(x,y,0.01,200),
+               c <- miniBatchGDiters(x,y,0.01,200,20),
+               d <- momentumMiniGDiters(x,y,0.01,200,20),
+               e <- nestrovMiniGDiters(x,y,0.01,200,20),
+               f <- adaMiniGDiters(x,y,1.5,200,20),
+               g <- adamMiniGDiters(x,y,1.5,200,20), times = 5)
+ind <- min(c(a$iters,b$iters,c$iters,d$iters,e$iters,f$iters,g$iters))
+plot(b$cost[1:ind], type = 'line' , col = "blue",xlab = "Iterations",ylab = "Cost",main = "Comparison of variants of Gradient Descent")
+lines(a$cost[1:ind], col = "red")
+lines(c$cost[1:ind], col = "green")
+lines(d$cost[1:ind], col = "orange")
+lines(e$cost[1:ind], col = "purple")
+lines(f$cost[1:ind], col = "yellow")
+lines(g$cost[1:ind], col = "gray")
+legend("topright",
+       legend = c("Stochastic","Batch","Mini Batch","Momentum with Mini-Batch",
+                  "Nestrov with Mini-Batch","Adagrad with Mini-Batch","Adam with Mini-Batch"),
+       col = c("blue","red","green","orange","purple","yellow","gray"),
+       pch = c(20,20), bty = "n", pt.cex = 1.5, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+```
+

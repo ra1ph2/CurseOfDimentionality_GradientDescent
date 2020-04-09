@@ -1,0 +1,134 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+# ```{r}
+# install.packages("mvtnorm", repos="http://R-Forge.R-project.org")
+# 
+# ```
+# 
+# ```{r}
+# library(mvtnorm)
+# n_dim = 10
+# dmvnorm(x=c(rep(0,n_dim)))
+# dmvnorm(x=c(rep(0,n_dim)), mean=c(rep(0,n_dim))) 
+# x <- rmvnorm(n=100, mean=c(rep(0,n_dim)))
+# plot(density(dist(rbind(x))), col="blue", xlim = c(0,50))
+# lp <- (max(dist(rbind(x))) - min(dist(rbind(x)))) / (min(dist(rbind(x))) + 0.001)
+# print(lp)
+# 
+# n_dim = 100
+# dmvnorm(x=c(rep(0,n_dim)))
+# dmvnorm(x=c(rep(0,n_dim)), mean=c(rep(0,n_dim))) 
+# x <- rmvnorm(n=10000, mean=c(rep(0,n_dim)))
+# lines(density(dist(rbind(x))), col ="red")
+# lp <- (max(dist(rbind(x))) - min(dist(rbind(x)))) / (min(dist(rbind(x))) + 0.001)
+# print(lp)
+# 
+# n_dim = 1000
+# dmvnorm(x=c(rep(0,n_dim)))
+# dmvnorm(x=c(rep(0,n_dim)), mean=c(rep(0,n_dim))) 
+# x <- rmvnorm(n=10, mean=c(rep(0,n_dim)))
+# lines(density(dist(rbind(x))), col ="orange")
+# lp <- (max(dist(rbind(x))) - min(dist(rbind(x)))) / (min(dist(rbind(x))) + 0.001)
+# print(lp)
+# ```
+# 
+# ```{r}
+# n_dim = 10
+# dmvnorm(x=c(rep(0,n_dim)))
+# dmvnorm(x=c(rep(0,n_dim)), mean=c(rep(0,n_dim))) 
+# x <- rmvnorm(n=10, mean=c(rep(0,n_dim)))
+# plot(density(dist(rbind(x))), col="blue", xlim=c(0,10))
+# hist(dist(rbind(x)))
+# ```
+# 
+# ```{r}
+# n_dim = 100
+# dmvnorm(x=c(rep(0,n_dim)))
+# dmvnorm(x=c(rep(0,n_dim)), mean=c(rep(0,n_dim))) 
+# x <- rmvnorm(n=100, mean=c(rep(0,n_dim)))
+# plot(density(dist(rbind(x))), col="blue" ,xlim=c(0,20))
+# hist(dist(rbind(x)))
+# ```
+# 
+# ```{r}
+# n_dim = 1000
+# dmvnorm(x=c(rep(0,n_dim)))
+# dmvnorm(x=c(rep(0,n_dim)), mean=c(rep(0,n_dim))) 
+# x <- rmvnorm(n=100, mean=c(rep(0,n_dim)))
+# plot(density(dist(rbind(x))), col="blue", xlim=c(0,50))
+# hist(dist(rbind(x)))
+# ```
+
+```{r}
+x <- runif(200)
+output <- matrix(unlist(x), ncol = 2, byrow = TRUE)
+plot(density(dist(rbind(output))), xlim = c(0,1.5), xlab = "Euclidien Distance", ylab = "Density")
+
+lp <- (max(dist(rbind(output))) - min(dist(rbind(output)))) / (min(dist(rbind(output))) + 0.001)
+print(lp)
+legend("topright",
+       legend = c("Dimensions - 2",lp),
+       col = c("red","blue"),
+       pch = c(20,20), bty = "n", pt.cex = 2, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+```
+
+```{r}
+x <- runif(500)
+output <- matrix(unlist(x), ncol = 5, byrow = TRUE)
+plot(density(dist(rbind(output))), xlim = c(0,2),xlab = "Euclidien Distance", ylab = "Density")
+
+lp <- (max(dist(rbind(output))) - min(dist(rbind(output)))) / (min(dist(rbind(output))) + 0.001)
+print(lp)
+legend("topright",
+       legend = c("Dimensions - 5",lp),
+       col = c("red","blue"),
+       pch = c(20,20), bty = "n", pt.cex = 2, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+
+```
+
+
+```{r}
+x <- runif(1000)
+output <- matrix(unlist(x), ncol = 10, byrow = TRUE)
+plot(density(dist(rbind(output))), xlim = c(0,2),xlab = "Euclidien Distance", ylab = "Density")
+lp <- (max(dist(rbind(output))) - min(dist(rbind(output)))) / (min(dist(rbind(output))) + 0.001)
+print(lp)
+legend("topleft",
+       legend = c("Dimensions - 10",lp),
+       col = c("red","blue"),
+       pch = c(20,20), bty = "n", pt.cex = 2, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+
+```
+
+```{r}
+
+x <- runif(10000)
+output <- matrix(unlist(x), ncol = 100, byrow = TRUE)
+plot(density(dist(rbind(output))), xlim=c(0,5),xlab = "Euclidien Distance", ylab = "Density")
+lp <- (max(dist(rbind(output))) - min(dist(rbind(output)))) / (min(dist(rbind(output))) + 0.001)
+print(lp)
+legend("topleft",
+       legend = c("Dimensions - 100",lp),
+       col = c("red","blue"),
+       pch = c(20,20), bty = "n", pt.cex = 2, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+
+```
+
+```{r}
+x <- runif(100000)
+output <- matrix(unlist(x), ncol = 1000, byrow = TRUE)
+plot(density(dist(rbind(output))),xlim=c(0,15),xlab = "Euclidien Distance", ylab = "Density")
+lp <- (max(dist(rbind(output))) - min(dist(rbind(output)))) / (min(dist(rbind(output))) + 0.001)
+print(lp)
+legend("topleft",
+       legend = c("Dimensions - 1000",lp),
+       col = c("red","blue"),
+       pch = c(20,20), bty = "n", pt.cex = 2, cex = 1.2, text.col = "black", horiz = F , inset = c(0.1, 0.1))
+
+```
+
